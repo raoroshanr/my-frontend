@@ -3,11 +3,18 @@
 <head>
     <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>GHSL Mobile Explorer</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100vw; overflow: hidden; font-family: sans-serif; }
+        /* Mobile-First Map Styling */
+        body, html, #map { 
+            margin: 0; padding: 0; height: 100%; width: 100vw; 
+            overflow: hidden; font-family: sans-serif; 
+        }
         
+        /* The Floating Control Panel */
         .panel { 
             position: absolute; bottom: 20px; left: 5%; width: 90%; 
             background: white; z-index: 1000; border-radius: 12px; 
@@ -17,32 +24,50 @@
         
         h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; }
         
+        /* Dropdown Styling */
         .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        select { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; background: #f9f9f9;}
+        select { 
+            padding: 10px; border-radius: 6px; border: 1px solid #ccc; 
+            font-size: 14px; background: #f9f9f9;
+        }
         
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        /* Action Button */
+        button { 
+            width: 100%; padding: 12px; background: #007bff; color: white; 
+            border: none; border-radius: 6px; font-size: 16px; 
+            font-weight: bold; cursor: pointer; 
+        }
         button:active { background: #0056b3; }
     </style>
 </head>
 <body>
+    
     <div id="map"></div>
     
     <div class="panel">
         <h3>GHSL Explorer</h3>
         
         <div class="input-group">
-            <select id="product-select">
-                <option value="POP">Population Density</option>
-                <option value="BUILT_S">Built-Up Surface Area</option>
+            <select id="product-select" style="flex: 1.5;">
+                <option value="POP">👥 Population</option>
+                <option value="BUILT_S">🏗️ Built-Up Surface</option>
+                <option value="BUILT_V">🏙️ Building Volume (3D)</option>
+                <option value="SMOD">🌍 Urbanization Model</option>
             </select>
             
-            <select id="epoch-select">
+            <select id="epoch-select" style="flex: 1;">
                 <option value="1975">1975</option>
+                <option value="1980">1980</option>
+                <option value="1985">1985</option>
                 <option value="1990">1990</option>
+                <option value="1995">1995</option>
                 <option value="2000">2000</option>
+                <option value="2005">2005</option>
+                <option value="2010">2010</option>
                 <option value="2015">2015</option>
                 <option value="2020" selected>2020</option>
-                <option value="2025">2025 (Estimate)</option>
+                <option value="2025">2025 (Est.)</option>
+                <option value="2030">2030 (Est.)</option>
             </select>
         </div>
         
@@ -50,42 +75,59 @@
     </div>
 
     <script>
-        const map = L.map('map', {zoomControl: false}).setView([20.0, 0.0], 3);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        // 1. Initialize the Base Map (Centered on India by default, feel free to adjust the coordinates!)
+        const map = L.map('map', {zoomControl: false}).setView([20.0, 77.0], 4);
+        
+        // Add OpenStreetMap base layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
+        // Variable to track our Earth Engine data so we can delete old layers
         let currentGeeLayer = null;
 
         // YOUR LIVE CLOUD RUN BACKEND URL
         const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
 
+        // 2. Button Click Event
         document.getElementById('load-btn').addEventListener('click', () => {
             const btn = document.getElementById('load-btn');
             const selectedProduct = document.getElementById('product-select').value;
             const selectedEpoch = document.getElementById('epoch-select').value;
             
+            // Change button text while we wait for Google's servers
             btn.innerText = "Loading Cloud Data...";
             
+            // Build the URL request
             const requestUrl = `${BACKEND_URL}/api/map-tiles?product=${selectedProduct}&epoch=${selectedEpoch}`;
 
+            // Fetch the map tiles from your backend
             fetch(requestUrl)
                 .then(res => res.json())
                 .then(data => {
                     if(data.tile_url) {
+                        
+                        // Delete the previous satellite layer if the user is loading a new one
                         if (currentGeeLayer) {
                             map.removeLayer(currentGeeLayer);
                         }
                         
+                        // Add the new satellite layer on top of the street map
                         currentGeeLayer = L.tileLayer(data.tile_url);
                         currentGeeLayer.addTo(map);
                         
+                        // Reset button
                         btn.innerText = "Update Map Layer";
+                        
                     } else {
+                        // If the backend sends an error, show it
                         alert("Error: " + data.error);
                         btn.innerText = "Error - Try Again";
                     }
                 })
                 .catch(err => {
-                    alert("Network Error: " + err);
+                    // If the network fails
+                    alert("Network Error: Make sure you are connected to the internet.");
                     btn.innerText = "Update Map Layer";
                 });
         });
