@@ -1,190 +1,388 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>DeepSeeGoa - GHSL Explorer</title>
-    
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>DeepSeeGoa — GHSL Explorer</title>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-    
-    <style>
-        body, html, #map { 
-            margin: 0; padding: 0; height: 100%; width: 100vw; 
-            overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-        }
-        
-        /* Floating Branding Badge */
-        .branding-badge {
-            position: absolute; top: 20px; left: 5%; width: auto; max-width: 80%;
-            background: white; z-index: 1000; border-radius: 8px;
-            padding: 10px 14px; box-shadow: 0px 4px 15px rgba(0,0,0,0.15);
-            pointer-events: auto;
-        }
-        .brand-title { font-size: 16px; font-weight: 700; color: #111; letter-spacing: -0.5px; }
-        .brand-sub { font-size: 9px; color: #666; margin-top: 1px; text-transform: uppercase; letter-spacing: 0.3px; }
-        
-        /* Bottom Control Panel */
-        .panel { 
-            position: absolute; bottom: 20px; left: 5%; width: 90%; 
-            background: white; z-index: 1000; border-radius: 12px; 
-            padding: 15px; box-sizing: border-box; box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
-        }
-        h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; color: #222; }
-        
-        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        select { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; background: #f9f9f9; width: 100%;}
-        
-        /* Transparency Slider */
-        .slider-container { margin-bottom: 15px; }
-        .slider-label { font-size: 13px; font-weight: bold; margin-bottom: 5px; display: block; color: #444;}
-        input[type=range] { width: 100%; }
 
-        button { 
-            width: 100%; padding: 12px; background: #007bff; color: white; 
-            border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --panel-bg: rgba(20, 24, 28, 0.92);
+            --panel-bg-solid: #14181c;
+            --ink: #eef1f3;
+            --ink-dim: #9aa4ab;
+            --accent: #14e0c4;
+            --accent-dim: rgba(20, 224, 196, 0.15);
+            --danger: #ff5470;
+            --border: rgba(255, 255, 255, 0.08);
+            --radius: 14px;
         }
-        button:active { background: #0056b3; }
-        
-        /* UI Adjustments */
+
+        * { box-sizing: border-box; }
+
+        body, html, #map {
+            margin: 0; padding: 0; height: 100%; width: 100vw;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0c0e10;
+        }
+
+        /* Branding badge */
+        .branding-badge {
+            position: absolute; top: 16px; left: 16px; z-index: 1000;
+            background: var(--panel-bg); backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            color: var(--ink);
+        }
+        .brand-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 16px; font-weight: 700; letter-spacing: -0.3px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .brand-title::before {
+            content: ''; width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent); box-shadow: 0 0 8px var(--accent);
+            display: inline-block;
+        }
+        .brand-sub {
+            font-size: 10px; color: var(--ink-dim); margin-top: 2px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        /* Legend */
+        .legend {
+            position: absolute; top: 16px; right: 16px; z-index: 1000;
+            background: var(--panel-bg); backdrop-filter: blur(10px);
+            border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 12px 14px; color: var(--ink); min-width: 180px;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+        }
+        .legend.visible { display: block; }
+        .legend-title {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--ink-dim); margin-bottom: 8px;
+        }
+        .legend-gradient {
+            height: 8px; border-radius: 4px; margin-bottom: 6px;
+        }
+        .legend-scale {
+            display: flex; justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-dim);
+        }
+        .legend-unit { font-size: 10px; color: var(--ink-dim); margin-top: 6px; }
+
+        /* Bottom control panel */
+        .panel {
+            position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            width: min(440px, 92vw);
+            background: var(--panel-bg); backdrop-filter: blur(10px);
+            z-index: 1000; border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 18px; box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+            color: var(--ink);
+        }
+        h3 {
+            margin: 0 0 14px 0; font-size: 15px; font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+            display: flex; align-items: center; justify-content: space-between;
+            color: var(--ink);
+        }
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%; background: var(--ink-dim);
+            display: inline-block; margin-right: 6px;
+        }
+        .status-dot.ok { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+        .status-dot.err { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+        .status-line { font-size: 10px; color: var(--ink-dim); font-weight: 400; display: flex; align-items: center; }
+
+        .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
+
+        label.field-label {
+            display: block; font-size: 10px; text-transform: uppercase;
+            letter-spacing: 0.4px; color: var(--ink-dim); margin-bottom: 4px;
+        }
+
+        select {
+            width: 100%; padding: 10px; border-radius: 8px;
+            border: 1px solid var(--border); font-size: 13px;
+            background: #1c2126; color: var(--ink);
+            font-family: 'Inter', sans-serif;
+        }
+        select:focus, input:focus, button:focus {
+            outline: 2px solid var(--accent); outline-offset: 1px;
+        }
+
+        .slider-container { margin-bottom: 16px; }
+        .slider-label {
+            font-size: 11px; margin-bottom: 6px; display: flex;
+            justify-content: space-between; color: var(--ink-dim);
+        }
+        .slider-label span:last-child { color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+        input[type=range] {
+            width: 100%; accent-color: var(--accent);
+        }
+
+        button#load-btn {
+            width: 100%; padding: 13px; background: var(--accent); color: #04231e;
+            border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+            cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+            transition: transform 0.1s ease, opacity 0.15s ease;
+        }
+        button#load-btn:hover { opacity: 0.9; }
+        button#load-btn:active { transform: scale(0.98); }
+        button#load-btn:disabled {
+            background: #3a3f44; color: var(--ink-dim); cursor: not-allowed;
+        }
+
+        .error-banner {
+            display: none; font-size: 12px; color: var(--danger);
+            background: rgba(255, 84, 112, 0.1); border: 1px solid rgba(255, 84, 112, 0.25);
+            border-radius: 8px; padding: 8px 10px; margin-bottom: 10px;
+        }
+        .error-banner.visible { display: block; }
+
         .leaflet-top.leaflet-right { top: 15px; }
     </style>
 </head>
 <body>
-    
+
     <div id="map"></div>
-    
+
     <div class="branding-badge">
         <div class="brand-title">DeepSeeGoa</div>
-        <div class="brand-sub">powered by Vinamravigyan Technologies Private Limited</div>
+        <div class="brand-sub">GHSL Explorer</div>
     </div>
-    
-    <div class="panel">
-        <h3>GHSL Explorer</h3>
-        
-        <div class="input-group">
-            <select id="product-select" style="flex: 1.5;">
-                <option value="POP">👥 Population</option>
-                <option value="BUILT_S">🏗️ Built-Up Surface</option>
-                <option value="BUILT_V">🏙️ Building Volume (3D)</option>
-                <option value="SMOD">🌍 Urbanization Model</option>
-                <option value="BUILT_H">📏 Building Height</option>
-                <option value="OBAT">🏠 OBAT Building Footprints</option>
-            </select>
-            
-            <select id="epoch-select" style="flex: 1;">
-                <option value="2020">2020</option>
-            </select>
+
+    <div class="legend" id="legend">
+        <div class="legend-title" id="legend-title">Layer</div>
+        <div class="legend-gradient" id="legend-gradient"></div>
+        <div class="legend-scale">
+            <span id="legend-min">0</span>
+            <span id="legend-max">100</span>
         </div>
+        <div class="legend-unit" id="legend-unit"></div>
+    </div>
+
+    <div class="panel">
+        <h3>
+            Map Layer
+            <span class="status-line"><span class="status-dot" id="status-dot"></span><span id="status-text">Connecting…</span></span>
+        </h3>
+
+        <div class="error-banner" id="error-banner"></div>
 
         <div class="input-group">
-            <select id="region-select">
-                <option value="All">🌍 Render Entire World</option>
-                <option value="North Goa">📍 Clip to North Goa</option>
-                <option value="South Goa">📍 Clip to South Goa</option>
-                <option value="Mumbai City">📍 Clip to Mumbai</option>
-                <option value="Bengaluru Urban">📍 Clip to Bengaluru</option>
-            </select>
+            <div style="flex: 1.5;">
+                <label class="field-label" for="product-select">Dataset</label>
+                <select id="product-select"></select>
+            </div>
+            <div style="flex: 1;">
+                <label class="field-label" for="epoch-select">Year</label>
+                <select id="epoch-select"></select>
+            </div>
         </div>
 
         <div class="slider-container">
             <label class="slider-label" for="opacity-slider">
-                Layer Opacity: <span id="opacity-val">100%</span>
+                <span>Layer opacity</span>
+                <span id="opacity-val">100%</span>
             </label>
             <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="1">
         </div>
-        
-        <button id="load-btn">Load Map Layer</button>
+
+        <button id="load-btn" disabled>Connecting to backend…</button>
     </div>
 
     <script>
-        // --- 1. DATA DICTIONARY & SMART DROPDOWNS ---
-        const productCatalog = {
-            "POP": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
-            "BUILT_S": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
-            "BUILT_V": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
-            "SMOD": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
-            "BUILT_H": ["2018"],          
-            "OBAT": ["Latest Available"]  
+        // Point this at your deployed Cloud Run backend.
+        const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
+
+        const PRODUCT_ICONS = {
+            POP: "👥", BUILT_S: "🏗️", BUILT_V: "🏙️", SMOD: "🌍", BUILT_H: "📏", OBAT: "🏠",
         };
 
         const productSelect = document.getElementById('product-select');
         const epochSelect = document.getElementById('epoch-select');
+        const loadBtn = document.getElementById('load-btn');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const errorBanner = document.getElementById('error-banner');
+        const legend = document.getElementById('legend');
 
-        // Force the dropdown to build itself correctly on the very first page load
-        function updateEpochDropdown() {
-            const validYears = productCatalog[productSelect.value];
+        let PRODUCT_CATALOG = {};
+
+        function showError(message) {
+            errorBanner.textContent = message;
+            errorBanner.classList.add('visible');
+        }
+        function clearError() {
+            errorBanner.classList.remove('visible');
+        }
+
+        function setStatus(ok, label) {
+            statusDot.className = 'status-dot ' + (ok === null ? '' : ok ? 'ok' : 'err');
+            statusText.textContent = label;
+        }
+
+        // Dataset <-> Year are mutually constrained: choosing a dataset narrows
+        // the year list to what it actually offers, and choosing a year narrows
+        // the dataset list to only those that publish that year.
+
+        function productsForYear(year) {
+            return Object.entries(PRODUCT_CATALOG).filter(([, cfg]) => cfg.years.includes(year));
+        }
+
+        function refreshEpochOptions() {
+            const cfg = PRODUCT_CATALOG[productSelect.value];
+            if (!cfg) return;
+            const prevEpoch = epochSelect.value;
             epochSelect.innerHTML = '';
-            validYears.forEach(year => {
+            cfg.years.forEach(year => {
                 const opt = document.createElement('option');
                 opt.value = year;
-                opt.innerHTML = year;
-                if (year === "2020") opt.selected = true;
+                opt.textContent = year;
                 epochSelect.appendChild(opt);
             });
+            // Keep the previously selected year if this dataset still offers it,
+            // otherwise fall back to the most recent year available.
+            epochSelect.value = cfg.years.includes(prevEpoch) ? prevEpoch : cfg.years[cfg.years.length - 1];
         }
-        
-        productSelect.addEventListener('change', updateEpochDropdown);
-        updateEpochDropdown(); // Run once immediately
 
-        // --- 2. MAP INITIALIZATION ---
-        const map = L.map('map', {zoomControl: false}).setView([15.3, 74.1], 8);
+        function refreshProductOptions() {
+            const year = epochSelect.value;
+            const prevProduct = productSelect.value;
+            const matching = productsForYear(year);
+            if (matching.length === 0) return;
+
+            productSelect.innerHTML = '';
+            matching.forEach(([key, cfg]) => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = `${PRODUCT_ICONS[key] || ''} ${cfg.label}`;
+                productSelect.appendChild(opt);
+            });
+            productSelect.value = matching.some(([key]) => key === prevProduct) ? prevProduct : matching[0][0];
+        }
+
+        function updateLegend(product) {
+            const cfg = PRODUCT_CATALOG[product];
+            if (!cfg || !cfg.vis || !cfg.vis.palette) {
+                legend.classList.remove('visible');
+                return;
+            }
+            document.getElementById('legend-title').textContent = cfg.label;
+            document.getElementById('legend-gradient').style.background =
+                `linear-gradient(to right, ${cfg.vis.palette.map(c => '#' + c).join(', ')})`;
+            document.getElementById('legend-min').textContent = cfg.vis.min;
+            document.getElementById('legend-max').textContent = cfg.vis.max;
+            document.getElementById('legend-unit').textContent = cfg.unit || '';
+            legend.classList.add('visible');
+        }
+
+        // --- Load the dataset catalog from the backend so the frontend never
+        // drifts out of sync with what the API actually supports. ---
+        async function loadCatalog() {
+            try {
+                const productsRes = await fetch(`${BACKEND_URL}/api/products`);
+                if (!productsRes.ok) throw new Error('Backend returned an error');
+
+                PRODUCT_CATALOG = await productsRes.json();
+
+                productSelect.innerHTML = '';
+                Object.entries(PRODUCT_CATALOG).forEach(([key, cfg]) => {
+                    const opt = document.createElement('option');
+                    opt.value = key;
+                    opt.textContent = `${PRODUCT_ICONS[key] || ''} ${cfg.label}`;
+                    productSelect.appendChild(opt);
+                });
+
+                refreshEpochOptions();
+                setStatus(true, 'Connected');
+                loadBtn.disabled = false;
+                loadBtn.textContent = 'Load map layer';
+            } catch (err) {
+                setStatus(false, 'Backend unreachable');
+                showError('Could not reach the backend. Check that it is deployed and CORS is configured for this origin.');
+                loadBtn.textContent = 'Backend unreachable';
+            }
+        }
+
+        productSelect.addEventListener('change', refreshEpochOptions);
+        epochSelect.addEventListener('change', () => {
+            refreshProductOptions();
+            refreshEpochOptions();
+        });
+
+        // --- Map setup ---
+        const map = L.map('map', { zoomControl: false }).setView([15.3, 74.1], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
+            attribution: '&copy; OpenStreetMap contributors',
         }).addTo(map);
 
         L.Control.geocoder({
-            defaultMarkGeocode: false, placeholder: "Search location...", position: 'topright'
-        }).on('markgeocode', function(e) {
-            map.fitBounds(e.geocode.bbox);
-        }).addTo(map);
+            defaultMarkGeocode: false, placeholder: 'Search location…', position: 'topright',
+        }).on('markgeocode', e => map.fitBounds(e.geocode.bbox)).addTo(map);
 
-        // --- 3. UI CONTROLS ---
+        // --- Opacity slider ---
         let currentGeeLayer = null;
         const opacitySlider = document.getElementById('opacity-slider');
         const opacityVal = document.getElementById('opacity-val');
-
-        opacitySlider.addEventListener('input', function(e) {
-            opacityVal.innerText = Math.round(e.target.value * 100) + '%';
+        opacitySlider.addEventListener('input', e => {
+            opacityVal.textContent = Math.round(e.target.value * 100) + '%';
             if (currentGeeLayer) currentGeeLayer.setOpacity(e.target.value);
         });
 
-        // YOUR LIVE CLOUD RUN BACKEND URL
-        const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
+        // --- Load layer ---
+        loadBtn.addEventListener('click', async () => {
+            clearError();
+            const product = productSelect.value;
+            const epoch = epochSelect.value;
 
-        // --- 4. FETCH LOGIC ---
-        document.getElementById('load-btn').addEventListener('click', () => {
-            const btn = document.getElementById('load-btn');
-            const selectedProduct = productSelect.value;
-            const selectedEpoch = epochSelect.value;
-            const selectedRegion = document.getElementById('region-select').value;
-            
-            btn.innerText = "Processing Cloud Data...";
-            
-            const requestUrl = `${BACKEND_URL}/api/map-tiles?product=${selectedProduct}&epoch=${selectedEpoch}&region=${selectedRegion}`;
+            const originalLabel = loadBtn.textContent;
+            loadBtn.disabled = true;
+            loadBtn.textContent = 'Loading…';
 
-            fetch(requestUrl)
-                .then(res => res.json())
-                .then(data => {
-                    if(data.tile_url) {
-                        if (currentGeeLayer) map.removeLayer(currentGeeLayer);
-                        
-                        currentGeeLayer = L.tileLayer(data.tile_url, { opacity: opacitySlider.value });
-                        currentGeeLayer.addTo(map);
-                        
-                        btn.innerText = "Update Map Layer";
-                    } else {
-                        alert("Error: " + data.error);
-                        btn.innerText = "Error - Try Again";
-                    }
-                })
-                .catch(err => {
-                    alert("Network Error. Check your connection.");
-                    btn.innerText = "Update Map Layer";
-                });
+            const url = `${BACKEND_URL}/api/map-tiles?product=${encodeURIComponent(product)}&epoch=${encodeURIComponent(epoch)}`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.detail || `Server returned ${res.status}`);
+                }
+                if (!data.tile_url) {
+                    throw new Error('No tile URL in response');
+                }
+
+                if (currentGeeLayer) map.removeLayer(currentGeeLayer);
+                currentGeeLayer = L.tileLayer(data.tile_url, { opacity: opacitySlider.value });
+                currentGeeLayer.addTo(map);
+                updateLegend(product);
+
+                loadBtn.textContent = 'Update map layer';
+            } catch (err) {
+                showError(err.message || 'Could not load this layer.');
+                loadBtn.textContent = originalLabel === 'Loading…' ? 'Load map layer' : originalLabel;
+            } finally {
+                loadBtn.disabled = false;
+            }
         });
+
+        loadCatalog();
     </script>
 </body>
 </html>
