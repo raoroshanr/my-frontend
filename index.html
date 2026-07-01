@@ -1,212 +1,86 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>DeepSeeGoa - GHSL Explorer</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-    
-    <style>
-        body, html, #map { 
-            margin: 0; padding: 0; height: 100%; width: 100vw; 
-            overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-        }
-        
-        /* Floating Branding Badge (Top Left) */
-        .branding-badge {
-            position: absolute;
-            top: 20px;
-            left: 5%;
-            width: auto;
-            max-width: 80%;
-            background: white;
-            z-index: 1000;
-            border-radius: 8px;
-            padding: 10px 14px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.15);
-            pointer-events: auto;
-        }
-        
-        .brand-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #111;
-            letter-spacing: -0.5px;
-        }
-        
-        .brand-sub {
-            font-size: 9px;
-            color: #666;
-            margin-top: 1px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        
-        /* Bottom Control Panel */
-        .panel { 
-            position: absolute; bottom: 20px; left: 5%; width: 90%; 
-            background: white; z-index: 1000; border-radius: 12px; 
-            padding: 15px; box-sizing: border-box;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
-        }
-        
-        h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; color: #222; }
-        
-        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        select { 
-            flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ccc; 
-            font-size: 14px; background: #f9f9f9; width: 100%;
-        }
-        
-        /* Transparency Slider */
-        .slider-container { margin-bottom: 15px; }
-        .slider-label { font-size: 13px; font-weight: bold; margin-bottom: 5px; display: block; color: #444;}
-        input[type=range] { width: 100%; }
+<script>
+        // --- 1. THE DATA DICTIONARY ---
+        // This maps exactly which years are valid for which datasets
+        const productCatalog = {
+            "POP": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
+            "BUILT_S": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
+            "BUILT_V": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
+            "SMOD": ["1975", "1980", "1985", "1990", "1995", "2000", "2005", "2010", "2015", "2020", "2025", "2030"],
+            "BUILT_H": ["2018"],          // Snapshot Dataset
+            "OBAT": ["Latest Available"]  // Vector Dataset
+        };
 
-        button { 
-            width: 100%; padding: 12px; background: #007bff; color: white; 
-            border: none; border-radius: 6px; font-size: 16px; 
-            font-weight: bold; cursor: pointer; 
-        }
-        button:active { background: #0056b3; }
-        
-        /* Reposition search box slightly lower to clear branding on tight screens */
-        .leaflet-top.leaflet-right {
-            top: 15px;
-        }
-    </style>
-</head>
-<body>
-    
-    <div id="map"></div>
-    
-    <div class="branding-badge">
-        <div class="brand-title">DeepSeeGoa</div>
-        <div class="brand-sub">powered by Vinamravigyan Technologies Private Limited</div>
-    </div>
-    
-    <div class="panel">
-        <h3>GHSL Explorer</h3>
-        
-        <div class="input-group">
-            <select id="product-select" style="flex: 1.5;">
-                <option value="POP">👥 Population</option>
-                <option value="BUILT_S">🏗️ Built-Up Surface</option>
-                <option value="BUILT_V">🏙️ Building Volume (3D)</option>
-                <option value="SMOD">🌍 Urbanization Model</option>
-            </select>
+        // --- 2. DYNAMIC UI UPDATER ---
+        const productSelect = document.getElementById('product-select');
+        const epochSelect = document.getElementById('epoch-select');
+
+        // When the user changes the dataset, update the year options
+        productSelect.addEventListener('change', function() {
+            const selectedProd = this.value;
+            const validYears = productCatalog[selectedProd];
             
-            <select id="epoch-select" style="flex: 1;">
-                <option value="1975">1975</option>
-                <option value="1980">1980</option>
-                <option value="1985">1985</option>
-                <option value="1990">1990</option>
-                <option value="1995">1995</option>
-                <option value="2000">2000</option>
-                <option value="2005">2005</option>
-                <option value="2010">2010</option>
-                <option value="2015">2015</option>
-                <option value="2020" selected>2020</option>
-                <option value="2025">2025</option>
-                <option value="2030">2030</option>
-            </select>
-        </div>
+            // Clear out the old options
+            epochSelect.innerHTML = '';
+            
+            // Populate the new options
+            validYears.forEach(year => {
+                const opt = document.createElement('option');
+                opt.value = year;
+                opt.innerHTML = year;
+                
+                // Keep 2020 as the default if it exists in the list
+                if (year === "2020") opt.selected = true;
+                
+                epochSelect.appendChild(opt);
+            });
+        });
 
-        <div class="input-group">
-            <select id="region-select">
-                <option value="All">🌍 Render Entire World</option>
-                <option value="North Goa">📍 Clip to North Goa</option>
-                <option value="South Goa">📍 Clip to South Goa</option>
-                <option value="Mumbai City">📍 Clip to Mumbai</option>
-                <option value="Bengaluru Urban">📍 Clip to Bengaluru</option>
-            </select>
-        </div>
+        // Add the new products to the HTML dropdown automatically
+        productSelect.innerHTML += `
+            <option value="BUILT_H">📏 Building Height</option>
+            <option value="OBAT">🏠 OBAT Building Footprints</option>
+        `;
 
-        <div class="slider-container">
-            <label class="slider-label" for="opacity-slider">
-                Layer Opacity: <span id="opacity-val">100%</span>
-            </label>
-            <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="1">
-        </div>
-        
-        <button id="load-btn">Load Map Layer</button>
-    </div>
-
-    <script>
-        // 1. Initialize Map centered broadly over Goa region
+        // --- 3. STANDARD MAP LOGIC ---
         const map = L.map('map', {zoomControl: false}).setView([15.3, 74.1], 8);
-        
-        // High-resolution OpenStreetMap base layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        L.Control.geocoder({
+            defaultMarkGeocode: false, placeholder: "Search location...", position: 'topright'
+        }).on('markgeocode', function(e) {
+            map.fitBounds(e.geocode.bbox);
         }).addTo(map);
 
-        // 2. Add Location Search Bar (Top Right)
-        L.Control.geocoder({
-            defaultMarkGeocode: false,
-            placeholder: "Search location...",
-            position: 'topright'
-        })
-        .on('markgeocode', function(e) {
-            const bbox = e.geocode.bbox;
-            const poly = L.polygon([
-                bbox.getSouthEast(),
-                bbox.getNorthEast(),
-                bbox.getNorthWest(),
-                bbox.getSouthWest()
-            ]);
-            map.fitBounds(poly.getBounds());
-        })
-        .addTo(map);
-
         let currentGeeLayer = null;
-        
-        // Connect the Opacity UI Slider
         const opacitySlider = document.getElementById('opacity-slider');
         const opacityVal = document.getElementById('opacity-val');
 
         opacitySlider.addEventListener('input', function(e) {
-            const val = e.target.value;
-            opacityVal.innerText = Math.round(val * 100) + '%';
-            
-            if (currentGeeLayer) {
-                currentGeeLayer.setOpacity(val);
-            }
+            opacityVal.innerText = Math.round(e.target.value * 100) + '%';
+            if (currentGeeLayer) currentGeeLayer.setOpacity(e.target.value);
         });
 
-        // Hardcoded, active backend url verified working on Europe-West1 infrastructure
+        // YOUR LIVE CLOUD RUN BACKEND URL
         const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
 
-        // 3. Handle Layer Generation Request
         document.getElementById('load-btn').addEventListener('click', () => {
             const btn = document.getElementById('load-btn');
-            const selectedProduct = document.getElementById('product-select').value;
-            const selectedEpoch = document.getElementById('epoch-select').value;
+            const selectedProduct = productSelect.value;
+            const selectedEpoch = epochSelect.value;
             const selectedRegion = document.getElementById('region-select').value;
             
             btn.innerText = "Processing Cloud Data...";
             
-            // Appending all query parameters securely to the API endpoint string
             const requestUrl = `${BACKEND_URL}/api/map-tiles?product=${selectedProduct}&epoch=${selectedEpoch}&region=${selectedRegion}`;
 
             fetch(requestUrl)
                 .then(res => res.json())
                 .then(data => {
                     if(data.tile_url) {
-                        if (currentGeeLayer) {
-                            map.removeLayer(currentGeeLayer);
-                        }
+                        if (currentGeeLayer) map.removeLayer(currentGeeLayer);
                         
-                        // Load incoming cloud layer honoring the current slider opacity configuration
-                        currentGeeLayer = L.tileLayer(data.tile_url, {
-                            opacity: opacitySlider.value 
-                        });
+                        currentGeeLayer = L.tileLayer(data.tile_url, { opacity: opacitySlider.value });
                         currentGeeLayer.addTo(map);
-                        
                         btn.innerText = "Update Map Layer";
                     } else {
                         alert("Error: " + data.error);
@@ -214,10 +88,8 @@
                     }
                 })
                 .catch(err => {
-                    alert("Network Error. Check your connection.");
+                    alert("Network Error.");
                     btn.innerText = "Update Map Layer";
                 });
         });
     </script>
-</body>
-</html>
