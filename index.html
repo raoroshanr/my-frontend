@@ -2,35 +2,91 @@
 <html lang="en">
 <head>
     <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>My Earth Engine App</title>
+    <title>GHSL Mobile Explorer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100vw; }
-        .panel { position: absolute; bottom: 20px; left: 5%; width: 90%; background: white; z-index: 1000; border-radius: 12px; padding: 15px; box-sizing: border-box;}
-        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px;}
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100vw; overflow: hidden; font-family: sans-serif; }
+        
+        .panel { 
+            position: absolute; bottom: 20px; left: 5%; width: 90%; 
+            background: white; z-index: 1000; border-radius: 12px; 
+            padding: 15px; box-sizing: border-box;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; }
+        
+        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        select { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; background: #f9f9f9;}
+        
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        button:active { background: #0056b3; }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    
     <div class="panel">
-        <button id="load-btn">Load Earth Engine Data</button>
+        <h3>GHSL Explorer</h3>
+        
+        <div class="input-group">
+            <select id="product-select">
+                <option value="POP">Population Density</option>
+                <option value="BUILT_S">Built-Up Surface Area</option>
+            </select>
+            
+            <select id="epoch-select">
+                <option value="1975">1975</option>
+                <option value="1990">1990</option>
+                <option value="2000">2000</option>
+                <option value="2015">2015</option>
+                <option value="2020" selected>2020</option>
+                <option value="2025">2025 (Estimate)</option>
+            </select>
+        </div>
+        
+        <button id="load-btn">Load Map Layer</button>
     </div>
 
     <script>
-        const map = L.map('map', {zoomControl: false}).setView([20.0, 0.0], 2);
+        const map = L.map('map', {zoomControl: false}).setView([20.0, 0.0], 3);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // PASTE YOUR GOOGLE CLOUD RUN URL HERE:
+        let currentGeeLayer = null;
+
+        // YOUR LIVE CLOUD RUN BACKEND URL
         const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
 
         document.getElementById('load-btn').addEventListener('click', () => {
-            document.getElementById('load-btn').innerText = "Loading...";
-            fetch(`${BACKEND_URL}/api/map-tiles`)
+            const btn = document.getElementById('load-btn');
+            const selectedProduct = document.getElementById('product-select').value;
+            const selectedEpoch = document.getElementById('epoch-select').value;
+            
+            btn.innerText = "Loading Cloud Data...";
+            
+            const requestUrl = `${BACKEND_URL}/api/map-tiles?product=${selectedProduct}&epoch=${selectedEpoch}`;
+
+            fetch(requestUrl)
                 .then(res => res.json())
                 .then(data => {
-                    if(data.tile_url) L.tileLayer(data.tile_url).addTo(map);
-                    document.getElementById('load-btn').innerText = "Data Loaded!";
+                    if(data.tile_url) {
+                        if (currentGeeLayer) {
+                            map.removeLayer(currentGeeLayer);
+                        }
+                        
+                        currentGeeLayer = L.tileLayer(data.tile_url);
+                        currentGeeLayer.addTo(map);
+                        
+                        btn.innerText = "Update Map Layer";
+                    } else {
+                        alert("Error: " + data.error);
+                        btn.innerText = "Error - Try Again";
+                    }
+                })
+                .catch(err => {
+                    alert("Network Error: " + err);
+                    btn.innerText = "Update Map Layer";
                 });
         });
     </script>
