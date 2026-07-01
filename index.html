@@ -2,19 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>GHSL Mobile Explorer</title>
+    <title>DeepSeeGoa - GHSL Explorer</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    
     <style>
-        /* Mobile-First Map Styling */
         body, html, #map { 
             margin: 0; padding: 0; height: 100%; width: 100vw; 
-            overflow: hidden; font-family: sans-serif; 
+            overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
         }
         
-        /* The Floating Control Panel */
+        /* Floating Branding Badge (Top Left) */
+        .branding-badge {
+            position: absolute;
+            top: 20px;
+            left: 5%;
+            width: auto;
+            max-width: 80%;
+            background: white;
+            z-index: 1000;
+            border-radius: 8px;
+            padding: 10px 14px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.15);
+            pointer-events: auto;
+        }
+        
+        .brand-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #111;
+            letter-spacing: -0.5px;
+        }
+        
+        .brand-sub {
+            font-size: 9px;
+            color: #666;
+            margin-top: 1px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        
+        /* Bottom Control Panel */
         .panel { 
             position: absolute; bottom: 20px; left: 5%; width: 90%; 
             background: white; z-index: 1000; border-radius: 12px; 
@@ -22,27 +54,40 @@
             box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
         }
         
-        h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; }
+        h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; color: #222; }
         
-        /* Dropdown Styling */
-        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
         select { 
             padding: 10px; border-radius: 6px; border: 1px solid #ccc; 
             font-size: 14px; background: #f9f9f9;
         }
         
-        /* Action Button */
+        /* Transparency Slider */
+        .slider-container { margin-bottom: 15px; }
+        .slider-label { font-size: 13px; font-weight: bold; margin-bottom: 5px; display: block; color: #444;}
+        input[type=range] { width: 100%; }
+
         button { 
             width: 100%; padding: 12px; background: #007bff; color: white; 
             border: none; border-radius: 6px; font-size: 16px; 
             font-weight: bold; cursor: pointer; 
         }
         button:active { background: #0056b3; }
+        
+        /* Geocoder Search Custom Position override to fit below branding on mobile */
+        .leaflet-top.leaflet-right {
+            top: 15px;
+        }
     </style>
 </head>
 <body>
     
     <div id="map"></div>
+    
+    <div class="branding-badge">
+        <div class="brand-title">DeepSeeGoa</div>
+        <div class="brand-sub">powered by Vinamravigyan Technologies Private Limited</div>
+    </div>
     
     <div class="panel">
         <h3>GHSL Explorer</h3>
@@ -66,68 +111,98 @@
                 <option value="2010">2010</option>
                 <option value="2015">2015</option>
                 <option value="2020" selected>2020</option>
-                <option value="2025">2025 (Est.)</option>
-                <option value="2030">2030 (Est.)</option>
+                <option value="2025">2025</option>
+                <option value="2030">2030</option>
             </select>
+        </div>
+
+        <div class="slider-container">
+            <label class="slider-label" for="opacity-slider">
+                Layer Opacity: <span id="opacity-val">100%</span>
+            </label>
+            <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="1">
         </div>
         
         <button id="load-btn">Load Map Layer</button>
     </div>
 
     <script>
-        // 1. Initialize the Base Map (Centered on India by default, feel free to adjust the coordinates!)
-        const map = L.map('map', {zoomControl: false}).setView([20.0, 77.0], 4);
+        // 1. Initialize Map centered broadly over India/Goa region
+        const map = L.map('map', {zoomControl: false}).setView([15.3, 74.1], 8);
         
-        // Add OpenStreetMap base layer
+        // Standard high-resolution OpenStreetMap basemap (contains administrative boundaries)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // Variable to track our Earth Engine data so we can delete old layers
-        let currentGeeLayer = null;
+        // 2. Add Location Search Bar (Positioned Top Right to keep UI balanced)
+        L.Control.geocoder({
+            defaultMarkGeocode: false,
+            placeholder: "Search location...",
+            position: 'topright'
+        })
+        .on('markgeocode', function(e) {
+            const bbox = e.geocode.bbox;
+            const poly = L.polygon([
+                bbox.getSouthEast(),
+                bbox.getNorthEast(),
+                bbox.getNorthWest(),
+                bbox.getSouthWest()
+            ]);
+            map.fitBounds(poly.getBounds());
+        })
+        .addTo(map);
 
-        // YOUR LIVE CLOUD RUN BACKEND URL
+        let currentGeeLayer = null;
+        
+        // Connect the Opacity Slider
+        const opacitySlider = document.getElementById('opacity-slider');
+        const opacityVal = document.getElementById('opacity-val');
+
+        opacitySlider.addEventListener('input', function(e) {
+            const val = e.target.value;
+            opacityVal.innerText = Math.round(val * 100) + '%';
+            
+            if (currentGeeLayer) {
+                currentGeeLayer.setOpacity(val);
+            }
+        });
+
+        // Your direct, fully functioning production backend url
         const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
 
-        // 2. Button Click Event
+        // 3. Handle Map Loading
         document.getElementById('load-btn').addEventListener('click', () => {
             const btn = document.getElementById('load-btn');
             const selectedProduct = document.getElementById('product-select').value;
             const selectedEpoch = document.getElementById('epoch-select').value;
             
-            // Change button text while we wait for Google's servers
             btn.innerText = "Loading Cloud Data...";
             
-            // Build the URL request
             const requestUrl = `${BACKEND_URL}/api/map-tiles?product=${selectedProduct}&epoch=${selectedEpoch}`;
 
-            // Fetch the map tiles from your backend
             fetch(requestUrl)
                 .then(res => res.json())
                 .then(data => {
                     if(data.tile_url) {
-                        
-                        // Delete the previous satellite layer if the user is loading a new one
                         if (currentGeeLayer) {
                             map.removeLayer(currentGeeLayer);
                         }
                         
-                        // Add the new satellite layer on top of the street map
-                        currentGeeLayer = L.tileLayer(data.tile_url);
+                        // Load the planetary tier imagery dynamically matching the active slider state
+                        currentGeeLayer = L.tileLayer(data.tile_url, {
+                            opacity: opacitySlider.value 
+                        });
                         currentGeeLayer.addTo(map);
                         
-                        // Reset button
                         btn.innerText = "Update Map Layer";
-                        
                     } else {
-                        // If the backend sends an error, show it
                         alert("Error: " + data.error);
                         btn.innerText = "Error - Try Again";
                     }
                 })
                 .catch(err => {
-                    // If the network fails
-                    alert("Network Error: Make sure you are connected to the internet.");
+                    alert("Network Error. Check your connection.");
                     btn.innerText = "Update Map Layer";
                 });
         });
