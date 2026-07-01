@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>My Earth Engine App</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body, html, #map { margin: 0; padding: 0; height: 100%; width: 100vw; }
+        .panel { position: absolute; bottom: 20px; left: 5%; width: 90%; background: white; z-index: 1000; border-radius: 12px; padding: 15px; box-sizing: border-box;}
+        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px;}
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="panel">
+        <button id="load-btn">Load Earth Engine Data</button>
+    </div>
+
+    <script>
+        const map = L.map('map', {zoomControl: false}).setView([20.0, 0.0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // PASTE YOUR GOOGLE CLOUD RUN URL HERE:
+        const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
+
+        document.getElementById('load-btn').addEventListener('click', () => {
+            document.getElementById('load-btn').innerText = "Loading...";
+            fetch(`${BACKEND_URL}/api/map-tiles`)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.tile_url) L.tileLayer(data.tile_url).addTo(map);
+                    document.getElementById('load-btn').innerText = "Data Loaded!";
+                });
+        });
+    </script>
+</body>
+</html>
