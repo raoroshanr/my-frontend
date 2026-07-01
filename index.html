@@ -56,10 +56,10 @@
         
         h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; color: #222; }
         
-        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
         select { 
-            padding: 10px; border-radius: 6px; border: 1px solid #ccc; 
-            font-size: 14px; background: #f9f9f9;
+            flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ccc; 
+            font-size: 14px; background: #f9f9f9; width: 100%;
         }
         
         /* Transparency Slider */
@@ -74,7 +74,7 @@
         }
         button:active { background: #0056b3; }
         
-        /* Geocoder Search Custom Position override to fit below branding on mobile */
+        /* Reposition search box slightly lower to clear branding on tight screens */
         .leaflet-top.leaflet-right {
             top: 15px;
         }
@@ -116,6 +116,16 @@
             </select>
         </div>
 
+        <div class="input-group">
+            <select id="region-select">
+                <option value="All">🌍 Render Entire World</option>
+                <option value="North Goa">📍 Clip to North Goa</option>
+                <option value="South Goa">📍 Clip to South Goa</option>
+                <option value="Mumbai City">📍 Clip to Mumbai</option>
+                <option value="Bengaluru Urban">📍 Clip to Bengaluru</option>
+            </select>
+        </div>
+
         <div class="slider-container">
             <label class="slider-label" for="opacity-slider">
                 Layer Opacity: <span id="opacity-val">100%</span>
@@ -127,15 +137,15 @@
     </div>
 
     <script>
-        // 1. Initialize Map centered broadly over India/Goa region
+        // 1. Initialize Map centered broadly over Goa region
         const map = L.map('map', {zoomControl: false}).setView([15.3, 74.1], 8);
         
-        // Standard high-resolution OpenStreetMap basemap (contains administrative boundaries)
+        // High-resolution OpenStreetMap base layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // 2. Add Location Search Bar (Positioned Top Right to keep UI balanced)
+        // 2. Add Location Search Bar (Top Right)
         L.Control.geocoder({
             defaultMarkGeocode: false,
             placeholder: "Search location...",
@@ -155,7 +165,7 @@
 
         let currentGeeLayer = null;
         
-        // Connect the Opacity Slider
+        // Connect the Opacity UI Slider
         const opacitySlider = document.getElementById('opacity-slider');
         const opacityVal = document.getElementById('opacity-val');
 
@@ -168,18 +178,20 @@
             }
         });
 
-        // Your direct, fully functioning production backend url
+        // Hardcoded, active backend url verified working on Europe-West1 infrastructure
         const BACKEND_URL = "https://my-backend-459477843630.europe-west1.run.app";
 
-        // 3. Handle Map Loading
+        // 3. Handle Layer Generation Request
         document.getElementById('load-btn').addEventListener('click', () => {
             const btn = document.getElementById('load-btn');
             const selectedProduct = document.getElementById('product-select').value;
             const selectedEpoch = document.getElementById('epoch-select').value;
+            const selectedRegion = document.getElementById('region-select').value;
             
-            btn.innerText = "Loading Cloud Data...";
+            btn.innerText = "Processing Cloud Data...";
             
-            const requestUrl = `${BACKEND_URL}/api/map-tiles?product=${selectedProduct}&epoch=${selectedEpoch}`;
+            // Appending all query parameters securely to the API endpoint string
+            const requestUrl = `${BACKEND_URL}/api/map-tiles?product=${selectedProduct}&epoch=${selectedEpoch}&region=${selectedRegion}`;
 
             fetch(requestUrl)
                 .then(res => res.json())
@@ -189,7 +201,7 @@
                             map.removeLayer(currentGeeLayer);
                         }
                         
-                        // Load the planetary tier imagery dynamically matching the active slider state
+                        // Load incoming cloud layer honoring the current slider opacity configuration
                         currentGeeLayer = L.tileLayer(data.tile_url, {
                             opacity: opacitySlider.value 
                         });
